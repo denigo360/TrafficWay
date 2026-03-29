@@ -1,0 +1,14 @@
+.DiagramContainer {
+    margin-top: 106px;
+    width: 566px;
+    height: 560px;
+    border-radius: 14px;
+    background-color: var(--foreground);
+  
+}
+
+.title {
+    font-weight: 500;
+    padding-top: 20px;
+    padding-left: 40px;
+}
