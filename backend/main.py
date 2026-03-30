@@ -1,8 +1,9 @@
 import os
 from fastapi import FastAPI, Depends, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from scapy.all import rdpcap, IP, TCP, Raw
-
+from sqlalchemy import func
 import database
 import models
 
@@ -18,6 +19,13 @@ from DPI.main import (
 
 app = FastAPI(title="DPI Traffic Analysis System")
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"], 
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 database.init_db()
 
@@ -84,7 +92,7 @@ def analyze_local_pcap(db: Session = Depends(database.get_db)):
                     sni=sni,
                     app_name=app_data.get('app', 'Other'),
                     category_name=app_data.get('type', 'Other'),
-                    confidence=0.95 if app_data.get('detected_by') != 'none' else 0.4
+                    confidence= 1.0 if app_data.get('detected_by') != 'none' else 0.4
                 )
                 db.add(flow)
                 added_count += 1
@@ -97,3 +105,26 @@ def get_logs(db: Session = Depends(database.get_db)):
     flows = db.query(models.TrafficFlow).all()
     
     return [flow.to_dict() for flow in flows]
+@app.get("/stats/categories")
+def get_traffic_categories_stats(db: Session = Depends(database.get_db)):
+    total_count = db.query(models.TrafficFlow).count()
+    
+    if total_count == 0:
+        return []
+
+    results = db.query(
+        models.TrafficFlow.category_name, 
+        func.count(models.TrafficFlow.id)
+    ).group_by(models.TrafficFlow.category_name).all()
+
+    
+    stats = []
+    for category, count in results:
+        percentage = round((count / total_count) * 100, 2)
+        stats.append({
+            "category": category if category else "Other",
+            "count": count,
+            "percentage": percentage
+        })
+    
+    return stats
