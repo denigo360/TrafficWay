@@ -11,4 +11,4 @@ COPY . .
 
 EXPOSE 8000
 
-CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["gunicorn", "backend.main:app", "-k", "uvicorn.workers.UvicornWorker", "--worker-class", "asgi", "--bind", "0.0.0.0:8000"]
