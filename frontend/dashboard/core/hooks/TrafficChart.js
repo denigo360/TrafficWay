@@ -10,7 +10,7 @@ export default function TrafficChart() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch('http://127.0.0.1:8000/stats/categories')
+    fetch('/api/stats/categories')
       .then((res) => res.json())
       .then((data) => {
         const labels = data.map((item) => item.category);
