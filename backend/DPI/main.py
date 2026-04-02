@@ -1171,6 +1171,7 @@ def analyze_pcap(filename):
         for app, count in app_stats.most_common(20):
             print(f"  {app:<35} {count:>4}")
 
+    return stats, type_stats, app_stats
 
 if __name__ == "__main__":
     if len(sys.argv) != 2:
