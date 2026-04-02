@@ -8,7 +8,7 @@ is_production = os.environ.get('TRAFFICWAY_PRODUCTION') is not None
 if is_production:
     postgres_user = os.environ['POSTGRES_USER']
     postgres_password = os.environ['POSTGRES_PASSWORD']
-    postgres_database = os.environ['POSTGRES_DATABASE']
+    postgres_database = os.environ['POSTGRES_DB']
     SQLALCHEMY_DATABASE_URL = f"postgresql://{postgres_user}:{postgres_password}@db:5432/{postgres_database}"
 else:
     SQLALCHEMY_DATABASE_URL = "sqlite///./traffic.db"
