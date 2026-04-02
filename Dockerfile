@@ -4,7 +4,7 @@ RUN rm /etc/nginx/conf.d/default.conf
 
 COPY nginx.conf /etc/nginx/conf.d/
 
-COPY ./frontend /usr/share/nginx/html
+COPY ./frontend/dashboard/out /usr/share/nginx/html
 
 EXPOSE 80
 
