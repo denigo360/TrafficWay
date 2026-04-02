@@ -4,3 +4,4 @@ uvicorn
 gunicorn
 sqlalchemy
 scapy
+psycopg2-binary
