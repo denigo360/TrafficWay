@@ -10,7 +10,7 @@ export default function TrafficChart() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch('http://127.0.0.1:8000/stats/categories')
+    fetch('http://127.0.0.1:8000/captures/2/stats')
       .then((res) => res.json())
       .then((data) => {
         const labels = data.map((item) => item.category);
@@ -28,6 +28,7 @@ export default function TrafficChart() {
                 'rgba(255, 206, 86, 0.6)', 
                 'rgba(75, 192, 192, 0.6)', 
                 'rgba(153, 102, 255, 0.6)', 
+                'rgba(255, 255, 0, 0.6)'
               ],
               borderColor: 'rgba(255, 255, 255, 1)',
               borderWidth: 2,
