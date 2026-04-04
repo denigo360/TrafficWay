@@ -5,12 +5,15 @@ import { Doughnut } from 'react-chartjs-2';
 
 ChartJS.register(ArcElement, Tooltip, Legend);
 
-export default function TrafficChart() {
+export default function TrafficChart({ captureId }) {
   const [chartData, setChartData] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch('http://127.0.0.1:8000/captures/2/stats')
+    if (!captureId) return;
+
+    setLoading(true);
+    fetch(`http://127.0.0.1:8000/captures/${captureId}/stats`)
       .then((res) => res.json())
       .then((data) => {
         const labels = data.map((item) => item.category);
@@ -37,21 +40,22 @@ export default function TrafficChart() {
         });
         setLoading(false);
       })
-      .catch((err) => console.error("Error fetching stats:", err));
-  }, []);
+      .catch((err) => {
+        console.error("Error fetching stats:", err);
+        setLoading(false);
+      });
+  }, [captureId]); 
 
   if (loading) return <p className="text-center">Loading Chart...</p>;
+  if (!chartData || chartData.labels.length === 0) return <p>No data for this session.</p>;
 
   return (
     <div className="p-4 bg-white rounded-lg shadow-md w-full max-w-md">
-      <h2 className="text-xl font-bold mb-4 text-center text-gray-800">Traffic Classification</h2>
       <Doughnut 
         data={chartData} 
         options={{
           responsive: true,
-          plugins: {
-            legend: { position: 'bottom' },
-          }
+          plugins: { legend: { position: 'bottom' } }
         }} 
       />
     </div>
