@@ -3,12 +3,14 @@ import styles from "./page.module.css";
 import GraphicArea from "../../components/GraphicArea/GraphicArea";
 import DiagramArea from "../../components/DiagrammArea/DiagramArea";
 import RequestLogArea from "../../components/RequestLogArea/RequestLogArea";
+import DragAndDrop from "../../components/DragAndDrop/DragAndDrop";
 export default function Home() {
   return (
     <div className={styles.page}>
-      <h1>Network Traffic Overview</h1>
+      <h1 className={styles.Title}>Network Traffic Overview</h1>
+    
       <div className={styles.GND}> 
-        <GraphicArea/>
+        <GraphicArea/> 
         <DiagramArea/>
       </div>
       <RequestLogArea/>

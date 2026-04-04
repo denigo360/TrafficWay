@@ -6,6 +6,12 @@
   background-color: var(--background);
 }
 
+.Title {
+  display: flex;
+  justify-content: center;
+  margin-top: -40px;
+}
+
 .GND {
   display: flex;
   gap: 46px;
