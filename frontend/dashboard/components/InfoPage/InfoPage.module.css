@@ -1,0 +1,22 @@
+.page {
+  color: var(--black);
+  margin-top: 120px;
+  padding: 0 42px;
+  font-family: var(--font-baloo-bhai-2);
+  background-color: var(--background);
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.Title {
+  display: flex;
+  justify-content: center;
+  margin-top: -40px;
+}
+
+.GND {
+  display: flex;
+  gap: 46px;
+  width: 100%;
+  flex-wrap: wrap;
+}
