@@ -1,6 +1,6 @@
 .page {
   color: var(--black);
-  margin-top: 120px;
+  margin-top: 20px;
   padding: 0 42px;
   font-family: var(--font-baloo-bhai-2);
   background-color: var(--background);
@@ -8,11 +8,6 @@
   box-sizing: border-box;
 }
 
-.Title {
-  display: flex;
-  justify-content: center;
-  margin-top: -40px;
-}
 
 .GND {
   display: flex;

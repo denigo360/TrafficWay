@@ -2,16 +2,16 @@
 
 import { useState, useEffect } from "react";
 import styles from "./InfoPage.module.css";
-import DiagramArea from "../DiagrammArea/DiagramArea";
-import InfoArea from "../InfoArea/InfoArea";
-import RequestLogArea from "../RequestLogArea/RequestLogArea";
+import DiagramArea from "../../../components/DiagrammArea/DiagramArea";
+import InfoArea from "../../../components/InfoArea/InfoArea";
+import RequestLogArea from "../../../components/RequestLogArea/RequestLogArea";
 
 export default function InfoPage() {
   const [selectedCaptureId, setSelectedCaptureId] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch('http://127.0.0.1:8000/captures')
+    fetch('http://127.0.0.1:8000/captures/')
       .then((res) => res.json())
       .then((data) => {
         if (data && data.length > 0) {
@@ -27,9 +27,7 @@ export default function InfoPage() {
 
   return (
     <div className={styles.page}>
-      <div className={styles.Title}>
-        <h1>Network Traffic Analytics Dashboard</h1>
-      </div>
+      
 
       {loading ? (
         <p>Connecting to backend...</p>
