@@ -1,6 +1,7 @@
 import os
+import shutil
 from datetime import datetime
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from sqlalchemy import func
@@ -19,7 +20,6 @@ from DPI.main import (
 
 app = FastAPI(title="DPI Traffic Analysis System")
 
-# Настройка CORS для работы с фронтендом
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"], 
@@ -28,24 +28,31 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Инициализация таблиц при запуске
 database.init_db()
 
-@app.post("/analyze_local_pcap")
-def analyze_local_pcap(db: Session = Depends(database.get_db)):
-    base_dir = os.path.dirname(os.path.abspath(__file__))
-    pcap_path = os.path.join(base_dir, "DPI", "test.pcap")
-    
-    if not os.path.exists(pcap_path):
-        print(f"[!] ОШИБКА: Файл не найден: {pcap_path}")
-        raise HTTPException(status_code=404, detail="PCAP file not found")
 
-    print(f"[*] ШАГ 1: Начало анализа. Файл: {pcap_path}")
+TEMP_DIR = "temp_uploads"
+os.makedirs(TEMP_DIR, exist_ok=True)
+
+@app.post("/analyze_pcap")
+async def analyze_pcap(file: UploadFile = File(...), db: Session = Depends(database.get_db)):
+    """
+    Принимает PCAP файл от пользователя, сохраняет его во временную папку и анализирует.
+    """
+    
+    file_path = os.path.join(TEMP_DIR, file.filename)
+    print(f"[*] ШАГ 1: Получен файл {file.filename}. Сохранение...")
+    
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+
+    print(f"[*] Начало анализа загруженного файла: {file_path}")
 
     try:
+        
         print("[*] ШАГ 2: Создание записи Capture в БД...")
         new_capture = models.Capture(
-            name=f"Analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+            name=f"Upload_{file.filename}_{datetime.now().strftime('%H%M%S')}"
         )
         db.add(new_capture)
         db.commit()
@@ -57,19 +64,18 @@ def analyze_local_pcap(db: Session = Depends(database.get_db)):
         udp_records = []
         pkt_count = 0
 
-        print("[*] ШАГ 4: Открытие PcapReader и чтение пакетов...")
-        with PcapReader(pcap_path) as reader:
+       
+        print("[*] ШАГ 4: Открытие PcapReader...")
+        with PcapReader(file_path) as reader:
             for pkt in reader:
                 pkt_count += 1
-                
                 if pkt_count % 500 == 0:
                     print(f"    ...обработано пакетов: {pkt_count}")
 
                 if not pkt.haslayer(IP):
                     continue
                 
-                src_ip = pkt[IP].src
-                dst_ip = pkt[IP].dst
+                src_ip, dst_ip = pkt[IP].src, pkt[IP].dst
 
                 if pkt.haslayer(TCP):
                     sport, dport = pkt[TCP].sport, pkt[TCP].dport
@@ -83,13 +89,11 @@ def analyze_local_pcap(db: Session = Depends(database.get_db)):
                         udp_records.append({"src": src_ip, "dst": dst_ip, "sport": sport, "dport": dport})
                         processed_udp_flows.add(u_key)
         
-        print(f"[+] ШАГ 5: Чтение завершено. Пакетов: {pkt_count}. TCP стримов: {len(reassembler.streams)}")
+        print(f"[+] ШАГ 5: Чтение завершено. TCP стримов: {len(reassembler.streams)}")
 
+        
         print("[*] ШАГ 6: Реассемблинг и DPI анализ...")
         for i, stream_key in enumerate(reassembler.streams.keys()):
-            if i % 10 == 0:
-                print(f"    ...анализ TCP потока {i} из {len(reassembler.streams)}")
-            
             stream_data = reassembler.get_reassembled_stream(stream_key)
             if not stream_data: continue
 
@@ -114,7 +118,6 @@ def analyze_local_pcap(db: Session = Depends(database.get_db)):
             app_name = app_data.get('app', 'Other TCP')
             category = app_data.get('type', 'Network')
             
-            # Базовая классификация по портам, если DPI не уверен
             if app_name in ['Other', 'HTTPS', 'Other TCP']:
                 if 22 in [p1, p2]: app_name, category = "SSH", "Remote Access"
                 elif 80 in [p1, p2]: app_name, category = "HTTP", "Web"
@@ -129,6 +132,7 @@ def analyze_local_pcap(db: Session = Depends(database.get_db)):
                 confidence=1.0 if (client_hello or app_name != "Other TCP") else 0.4
             ))
 
+        
         print("[*] ШАГ 7: Обработка UDP потоков...")
         for u in udp_records:
             u_app, u_cat = "UDP", "Network"
@@ -142,15 +146,22 @@ def analyze_local_pcap(db: Session = Depends(database.get_db)):
                 app_name=u_app, category_name=u_cat, confidence=0.8
             ))
 
-        print("[*] ШАГ 8: Финальный коммит в базу данных...")
         db.commit()
-        print("[!] УСПЕХ: Анализ завершен, данные сохранены.")
-        return {"status": "success", "capture_id": new_capture.id, "flows_count": len(reassembler.streams) + len(udp_records)}
+        print("[!] УСПЕХ: Анализ завершен.")
+        
+        
+        os.remove(file_path)
+        
+        return {"status": "success", "capture_id": new_capture.id}
 
     except Exception as e:
+        if os.path.exists(file_path):
+            os.remove(file_path)
         print(f"[!!!] КРИТИЧЕСКАЯ ОШИБКА: {str(e)}")
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
+
+
 
 @app.get("/captures")
 def get_all_captures(db: Session = Depends(database.get_db)):
@@ -192,18 +203,15 @@ def get_capture_summary(capture_id: int, db: Session = Depends(database.get_db))
     for f in flows:
         unique_ips.add(f.src_ip)
         unique_ips.add(f.dst_ip)
-        
         if f.app_name in ['DNS', 'UDP', 'QUIC/HTTP3']:
             protocols.append("UDP")
         else:
             protocols.append("TCP")
-        
         app_names.append(f.app_name)
 
-    
     from collections import Counter
-    top_app = Counter(app_names).most_common(1)[0][0]
-    top_proto = Counter(protocols).most_common(1)[0][0]
+    top_app = Counter(app_names).most_common(1)[0][0] if app_names else "N/A"
+    top_proto = Counter(protocols).most_common(1)[0][0] if protocols else "N/A"
 
     return {
         "total_flows": len(flows),
