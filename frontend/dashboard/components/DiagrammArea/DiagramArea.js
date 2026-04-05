@@ -6,7 +6,9 @@ export default function DiagramArea({ captureId }) {
   return (
     <div className={styles.DiagramContainer}>
       <h2 className={styles.title}>Category Share</h2>
-      <TrafficChart captureId={captureId} />
+      <div className={styles.ChartWrapper}>
+        <TrafficChart captureId={captureId} />
+      </div>
     </div>
   );
 }

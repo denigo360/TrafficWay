@@ -19,6 +19,7 @@ from DPI.main import (
 
 app = FastAPI(title="DPI Traffic Analysis System")
 
+# Настройка CORS для работы с фронтендом
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"], 
@@ -27,6 +28,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Инициализация таблиц при запуске
 database.init_db()
 
 @app.post("/analyze_local_pcap")
@@ -35,30 +37,34 @@ def analyze_local_pcap(db: Session = Depends(database.get_db)):
     pcap_path = os.path.join(base_dir, "DPI", "test.pcap")
     
     if not os.path.exists(pcap_path):
-        print(f"[ERROR] File not found at: {pcap_path}")
-        raise HTTPException(status_code=404, detail=f"PCAP file not found")
+        print(f"[!] ОШИБКА: Файл не найден: {pcap_path}")
+        raise HTTPException(status_code=404, detail="PCAP file not found")
 
-    print(f"[*] Starting. File: {pcap_path}")
+    print(f"[*] ШАГ 1: Начало анализа. Файл: {pcap_path}")
 
     try:
-        print("[*] Creating Capture record in DB...")
+        print("[*] ШАГ 2: Создание записи Capture в БД...")
         new_capture = models.Capture(
             name=f"Analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
         )
         db.add(new_capture)
         db.commit()
         db.refresh(new_capture)
-        print(f"[+] Capture created. ID: {new_capture.id}")
+        print(f"[+] ШАГ 3: Запись создана. ID сессии: {new_capture.id}")
 
         reassembler = TCPStreamReassembler()
         processed_udp_flows = set()
         udp_records = []
         pkt_count = 0
 
-        print("[*] Reading packets with PcapReader...")
+        print("[*] ШАГ 4: Открытие PcapReader и чтение пакетов...")
         with PcapReader(pcap_path) as reader:
             for pkt in reader:
                 pkt_count += 1
+                
+                if pkt_count % 500 == 0:
+                    print(f"    ...обработано пакетов: {pkt_count}")
+
                 if not pkt.haslayer(IP):
                     continue
                 
@@ -77,10 +83,13 @@ def analyze_local_pcap(db: Session = Depends(database.get_db)):
                         udp_records.append({"src": src_ip, "dst": dst_ip, "sport": sport, "dport": dport})
                         processed_udp_flows.add(u_key)
         
-        print(f"[+] Packets processed: {pkt_count}. Streams found: {len(reassembler.streams)}")
+        print(f"[+] ШАГ 5: Чтение завершено. Пакетов: {pkt_count}. TCP стримов: {len(reassembler.streams)}")
 
-        print("[*] Reassembling and analyzing TCP streams...")
-        for stream_key in reassembler.streams.keys():
+        print("[*] ШАГ 6: Реассемблинг и DPI анализ...")
+        for i, stream_key in enumerate(reassembler.streams.keys()):
+            if i % 10 == 0:
+                print(f"    ...анализ TCP потока {i} из {len(reassembler.streams)}")
+            
             stream_data = reassembler.get_reassembled_stream(stream_key)
             if not stream_data: continue
 
@@ -105,7 +114,8 @@ def analyze_local_pcap(db: Session = Depends(database.get_db)):
             app_name = app_data.get('app', 'Other TCP')
             category = app_data.get('type', 'Network')
             
-            if app_name in ['Other', 'HTTPS']:
+            # Базовая классификация по портам, если DPI не уверен
+            if app_name in ['Other', 'HTTPS', 'Other TCP']:
                 if 22 in [p1, p2]: app_name, category = "SSH", "Remote Access"
                 elif 80 in [p1, p2]: app_name, category = "HTTP", "Web"
 
@@ -119,7 +129,7 @@ def analyze_local_pcap(db: Session = Depends(database.get_db)):
                 confidence=1.0 if (client_hello or app_name != "Other TCP") else 0.4
             ))
 
-        print("[*] Processing UDP flows...")
+        print("[*] ШАГ 7: Обработка UDP потоков...")
         for u in udp_records:
             u_app, u_cat = "UDP", "Network"
             if 53 in [u['sport'], u['dport']]: u_app, u_cat = "DNS", "System"
@@ -132,13 +142,13 @@ def analyze_local_pcap(db: Session = Depends(database.get_db)):
                 app_name=u_app, category_name=u_cat, confidence=0.8
             ))
 
-        print("[*] Committing to database...")
+        print("[*] ШАГ 8: Финальный коммит в базу данных...")
         db.commit()
-        print("[!] DONE. Request finished.")
+        print("[!] УСПЕХ: Анализ завершен, данные сохранены.")
         return {"status": "success", "capture_id": new_capture.id, "flows_count": len(reassembler.streams) + len(udp_records)}
 
     except Exception as e:
-        print(f"[FATAL ERROR] {str(e)}")
+        print(f"[!!!] КРИТИЧЕСКАЯ ОШИБКА: {str(e)}")
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -167,4 +177,37 @@ def delete_capture(capture_id: int, db: Session = Depends(database.get_db)):
         raise HTTPException(status_code=404, detail="Capture session not found")
     db.delete(capture)
     db.commit()
-    return {"status": "deleted"}
+    return {"status": "deleted"} 
+
+@app.get("/captures/{capture_id}/summary")
+def get_capture_summary(capture_id: int, db: Session = Depends(database.get_db)):
+    flows = db.query(models.TrafficFlow).filter(models.TrafficFlow.capture_id == capture_id).all()
+    if not flows:
+        return {"error": "No data"}
+
+    unique_ips = set()
+    protocols = []
+    app_names = []
+
+    for f in flows:
+        unique_ips.add(f.src_ip)
+        unique_ips.add(f.dst_ip)
+        
+        if f.app_name in ['DNS', 'UDP', 'QUIC/HTTP3']:
+            protocols.append("UDP")
+        else:
+            protocols.append("TCP")
+        
+        app_names.append(f.app_name)
+
+    
+    from collections import Counter
+    top_app = Counter(app_names).most_common(1)[0][0]
+    top_proto = Counter(protocols).most_common(1)[0][0]
+
+    return {
+        "total_flows": len(flows),
+        "unique_endpoints": len(unique_ips),
+        "top_app": top_app,
+        "primary_protocol": top_proto  
+    }

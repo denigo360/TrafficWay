@@ -46,18 +46,34 @@ export default function TrafficChart({ captureId }) {
       });
   }, [captureId]); 
 
-  if (loading) return <p className="text-center">Loading Chart...</p>;
-  if (!chartData || chartData.labels.length === 0) return <p>No data for this session.</p>;
+  if (loading) return <p>Loading Chart...</p>;
+  if (!chartData || chartData.labels.length === 0) return <p>No data</p>;
+
+  const options = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        position: 'bottom',
+        labels: {
+          boxWidth: 15,
+          padding: 15,
+          font: {
+            size: 12
+          }
+        }
+      }
+    },
+    layout: {
+      padding: {
+        bottom: 20
+      }
+    }
+  };
 
   return (
-    <div className="p-4 bg-white rounded-lg shadow-md w-full max-w-md">
-      <Doughnut 
-        data={chartData} 
-        options={{
-          responsive: true,
-          plugins: { legend: { position: 'bottom' } }
-        }} 
-      />
+    <div style={{ position: 'relative', height: '100%', width: '100%' }}>
+      <Doughnut data={chartData} options={options} />
     </div>
   );
 }
