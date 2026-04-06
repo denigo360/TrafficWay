@@ -5,12 +5,15 @@ import { Doughnut } from 'react-chartjs-2';
 
 ChartJS.register(ArcElement, Tooltip, Legend);
 
-export default function TrafficChart() {
+export default function TrafficChart({ captureId }) {
   const [chartData, setChartData] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch('/api/stats/categories')
+    if (!captureId) return;
+
+    setLoading(true);
+    fetch(`/api/captures/${captureId}/stats`)
       .then((res) => res.json())
       .then((data) => {
         const labels = data.map((item) => item.category);
@@ -28,6 +31,7 @@ export default function TrafficChart() {
                 'rgba(255, 206, 86, 0.6)', 
                 'rgba(75, 192, 192, 0.6)', 
                 'rgba(153, 102, 255, 0.6)', 
+                'rgba(255, 255, 0, 0.6)'
               ],
               borderColor: 'rgba(255, 255, 255, 1)',
               borderWidth: 2,
@@ -36,23 +40,40 @@ export default function TrafficChart() {
         });
         setLoading(false);
       })
-      .catch((err) => console.error("Error fetching stats:", err));
-  }, []);
+      .catch((err) => {
+        console.error("Error fetching stats:", err);
+        setLoading(false);
+      });
+  }, [captureId]); 
 
-  if (loading) return <p className="text-center">Loading Chart...</p>;
+  if (loading) return <p>Loading Chart...</p>;
+  if (!chartData || chartData.labels.length === 0) return <p>No data</p>;
+
+  const options = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        position: 'bottom',
+        labels: {
+          boxWidth: 15,
+          padding: 15,
+          font: {
+            size: 12
+          }
+        }
+      }
+    },
+    layout: {
+      padding: {
+        bottom: 20
+      }
+    }
+  };
 
   return (
-    <div className="p-4 bg-white rounded-lg shadow-md w-full max-w-md">
-      <h2 className="text-xl font-bold mb-4 text-center text-gray-800">Traffic Classification</h2>
-      <Doughnut 
-        data={chartData} 
-        options={{
-          responsive: true,
-          plugins: {
-            legend: { position: 'bottom' },
-          }
-        }} 
-      />
+    <div style={{ position: 'relative', height: '100%', width: '100%' }}>
+      <Doughnut data={chartData} options={options} />
     </div>
   );
 }

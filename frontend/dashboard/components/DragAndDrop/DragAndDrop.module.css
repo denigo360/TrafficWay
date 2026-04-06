@@ -1,0 +1,187 @@
+/* Основной контейнер */
+.wrapper {
+  width: 1836px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* Зона Drag & Drop */
+.dropZone {
+  width: 100%;
+  height: 240px;
+  border: 2px dashed #ccc; 
+  border-radius: 14px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  background-color: var(--foreground);
+  transition: all 0.3s ease;
+  margin: 20px 0;
+  cursor: pointer;
+  gap: 10px;
+}
+
+.dropZone:hover {
+  border-color: var(--description-color);
+  background-color: #f9f9f9;
+}
+
+.dropZoneActive {
+  border-color: var(--description-color);
+  background-color: #eef7ff;
+  transform: scale(1.005);
+}
+
+.hint {
+  margin: 0;
+  color: #999;
+  font-size: 14px;
+}
+
+/* Кнопка внутри зоны */
+.uploadButton {
+  background-color: var(--description-color);
+  color: white;
+  border: none;
+  padding: 12px 30px;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.uploadButton:hover {
+  background-color: var(--black);
+}
+
+.hiddenInput {
+  display: none;
+}
+
+/* Секция со списком файлов */
+.fileContainer {
+  padding: 25px;
+  background-color: var(--foreground);
+  border-radius: 14px;
+  border: 1px solid #eee;
+}
+
+.listTitle {
+  margin: 0 0 20px 0;
+  font-size: 14px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #666;
+}
+
+/* Сетка карточек */
+.fileGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 15px;
+}
+
+/* Карточка файла (теперь кликабельная) */
+.fileCard {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 12px;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.2s ease;
+}
+
+.fileCard:hover {
+  transform: translateY(-3px);
+  border-color: var(--description-color);
+  box-shadow: 0 6px 15px rgba(0, 0, 0, 0.08);
+}
+
+.fileCard:active {
+  transform: scale(0.98);
+}
+
+/* Состояние анализа файла */
+.fileCardAnalyzing {
+  border-color: #28a745;
+  background-color: #f6fff8;
+  cursor: wait;
+  pointer-events: none;
+}
+
+.fileCardAnalyzing .fileName {
+  color: #28a745;
+  font-weight: 700;
+}
+
+/* Анимированная полоска прогресса внизу карточки */
+.fileCardAnalyzing::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 4px;
+  width: 100%;
+  background: linear-gradient(90deg, transparent, #28a745, transparent);
+  animation: loadingBar 1.5s infinite linear;
+}
+
+@keyframes loadingBar {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+/* Информация о файле */
+.fileInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  overflow: hidden;
+}
+
+.fileName {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--black);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fileSize {
+  font-size: 12px;
+  color: #888;
+}
+
+/* Кнопка удаления */
+.deleteBtn {
+  background: #f0f0f0;
+  border: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  cursor: pointer;
+  color: #666;
+  font-size: 12px;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.deleteBtn:hover {
+  background-color: #ff4d4f;
+  color: white;
+  transform: rotate(90deg);
+}
