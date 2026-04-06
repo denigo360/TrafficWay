@@ -1,0 +1,17 @@
+.page {
+  color: var(--black);
+  margin-top: 20px;
+  padding: 0 42px;
+  font-family: var(--font-baloo-bhai-2);
+  background-color: var(--background);
+  width: 100%;
+  box-sizing: border-box;
+}
+
+
+.GND {
+  display: flex;
+  gap: 46px;
+  width: 100%;
+  flex-wrap: wrap;
+}
