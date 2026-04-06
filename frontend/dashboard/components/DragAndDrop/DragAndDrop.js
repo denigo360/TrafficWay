@@ -6,34 +6,32 @@ import styles from './DragAndDrop.module.css';
 export default function DragAndDrop() {
   const [isDragActive, setIsDragActive] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState([]);
-  const [isLoaded, setIsLoaded] = useState(false); // Флаг для контроля синхронизации с памятью
+  const [isLoaded, setIsLoaded] = useState(false);
   const [analyzingIndex, setAnalyzingIndex] = useState(null);
   const fileInputRef = useRef(null);
   const router = useRouter();
 
-  // 1. ЗАГРУЗКА: При монтировании достаем список из localStorage
   useEffect(() => {
     const savedFiles = localStorage.getItem('traffic_uploaded_files');
     if (savedFiles) {
       try {
-        const parsed = JSON.parse(savedFiles);
-        setUploadedFiles(parsed);
+        setUploadedFiles(JSON.parse(savedFiles));
       } catch (e) {
         console.error("Ошибка парсинга localStorage:", e);
       }
     }
-    setIsLoaded(true); // Разрешаем сохранение после того, как попытка загрузки завершена
+    setIsLoaded(true);
   }, []);
 
-  // 2. СОХРАНЕНИЕ: Записываем метаданные при изменении списка
   useEffect(() => {
-    if (!isLoaded) return; // Защита от затирания: не сохраняем, пока не подгрузили старое
+    if (!isLoaded) return; 
 
     const filesToSave = uploadedFiles.map(f => ({
       name: f.name,
       size: f.size,
       lastModified: f.lastModified,
-      isAnalyzed: f.isAnalyzed || false
+      isAnalyzed: f.isAnalyzed || false,
+      captureId: f.captureId || null // Сохраняем ID из базы
     }));
     
     localStorage.setItem('traffic_uploaded_files', JSON.stringify(filesToSave));
@@ -41,7 +39,6 @@ export default function DragAndDrop() {
 
   const handleFiles = (newFiles) => {
     const filesArray = Array.from(newFiles);
-    // Добавляем новые файлы к текущим
     setUploadedFiles((prev) => [...prev, ...filesArray]);
   };
 
@@ -50,9 +47,14 @@ export default function DragAndDrop() {
 
     const fileToAnalyze = uploadedFiles[index];
 
-    // Проверка: является ли объект реальным файлом (бинарным) или просто метаданными из localStorage
+    // Если файл уже был проанализирован, переходим по его конкретному ID
+    if (fileToAnalyze.isAnalyzed && fileToAnalyze.captureId) {
+      router.push(`/InfoPage?id=${fileToAnalyze.captureId}`);
+      return;
+    }
+
     if (!(fileToAnalyze instanceof File)) {
-      alert("Для повторного анализа выберите файл заново (браузер не хранит содержимое файлов в памяти после перезагрузки)");
+      alert("Для анализа выберите файл заново (сессия истекла)");
       return;
     }
 
@@ -67,12 +69,15 @@ export default function DragAndDrop() {
       });
 
       if (response.ok) {
-        // Помечаем файл как успешно проанализированный перед уходом со страницы
+        const data = await response.json();
+        
         const updated = [...uploadedFiles];
         updated[index].isAnalyzed = true;
+        updated[index].captureId = data.capture_id; // Записываем ID, пришедший с бэкенда
         setUploadedFiles(updated);
 
-        router.push('/InfoPage');
+        // Переходим на страницу с параметром ID
+        router.push(`/InfoPage?id=${data.capture_id}`);
       } else {
         alert(`Ошибка при анализе файла ${fileToAnalyze.name}`);
         setAnalyzingIndex(null);
@@ -84,25 +89,16 @@ export default function DragAndDrop() {
     }
   };
 
-  const handleDragOver = (e) => {
-    e.preventDefault();
-    setIsDragActive(true);
-  };
-
-  const handleDragLeave = () => {
-    setIsDragActive(false);
-  };
-
+  const handleDragOver = (e) => { e.preventDefault(); setIsDragActive(true); };
+  const handleDragLeave = () => { setIsDragActive(false); };
   const handleDrop = (e) => {
     e.preventDefault();
     setIsDragActive(false);
-    if (e.dataTransfer.files?.length > 0) {
-      handleFiles(e.dataTransfer.files);
-    }
+    if (e.dataTransfer.files?.length > 0) handleFiles(e.dataTransfer.files);
   };
 
   const removeFile = (e, index) => {
-    e.stopPropagation(); // Чтобы не запустился анализ при нажатии на крестик
+    e.stopPropagation();
     setUploadedFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
@@ -116,12 +112,8 @@ export default function DragAndDrop() {
         onClick={() => fileInputRef.current.click()}
       >
         <input 
-          type="file" 
-          className={styles.hiddenInput} 
-          ref={fileInputRef} 
-          onChange={(e) => handleFiles(e.target.files)}
-          multiple 
-          accept=".pcap,.pcapng"
+          type="file" ref={fileInputRef} className={styles.hiddenInput} 
+          onChange={(e) => handleFiles(e.target.files)} multiple accept=".pcap,.pcapng"
         />
         <button className={styles.uploadButton} onClick={(e) => { e.stopPropagation(); fileInputRef.current.click(); }}>
           Выбрать файлы
@@ -136,11 +128,7 @@ export default function DragAndDrop() {
             {uploadedFiles.map((file, index) => (
               <div 
                 key={`${file.name}-${index}`} 
-                className={`
-                    ${styles.fileCard} 
-                    ${analyzingIndex === index ? styles.fileCardAnalyzing : ''} 
-                    ${file.isAnalyzed ? styles.fileCardDone : ''}
-                `}
+                className={`${styles.fileCard} ${analyzingIndex === index ? styles.fileCardAnalyzing : ''} ${file.isAnalyzed ? styles.fileCardDone : ''}`}
                 onClick={() => handleFileClick(index)}
               >
                 <div className={styles.fileInfo}>
@@ -148,18 +136,10 @@ export default function DragAndDrop() {
                     {analyzingIndex === index ? "⏳ Analyzing..." : file.name}
                     {file.isAnalyzed && " ✅"}
                   </span>
-                  <span className={styles.fileSize}>
-                    {(file.size / 1024).toFixed(1)} KB
-                  </span>
+                  <span className={styles.fileSize}>{(file.size / 1024).toFixed(1)} KB</span>
                 </div>
-                
                 {analyzingIndex !== index && (
-                  <button 
-                    className={styles.deleteBtn} 
-                    onClick={(e) => removeFile(e, index)}
-                  >
-                    ✕
-                  </button>
+                  <button className={styles.deleteBtn} onClick={(e) => removeFile(e, index)}>✕</button>
                 )}
               </div>
             ))}
